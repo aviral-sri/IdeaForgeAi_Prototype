@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Download, Printer, Share2 } from "lucide-react"
 import type { BlueprintData } from "@/app/actions"
+import { jsPDF } from "jspdf"
+import html2canvas from "html2canvas"
 
 type BlueprintProps = {
   blueprint: BlueprintData
@@ -14,27 +16,45 @@ type BlueprintProps = {
 export function BlueprintOutput({ blueprint }: BlueprintProps) {
   const [activeTab, setActiveTab] = useState("all")
 
-  const formatTechPreferences = (prefs: string[]) => {
-    return prefs
-      .map((pref) => {
-        if (pref === "not-sure") return "Not sure"
-        return pref.charAt(0).toUpperCase() + pref.slice(1)
-      })
-      .join(", ")
-  }
-
   const handlePrint = () => {
     window.print()
   }
 
-  const handleDownload = () => {
-    // In a real app, this would generate a PDF
-    alert("In a real app, this would download a PDF of your blueprint")
+  const handleDownload = async () => {
+    const element = document.getElementById('blueprint-content')
+    if (!element) return
+
+    try {
+      const canvas = await html2canvas(element)
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgData = canvas.toDataURL('image/png')
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+      pdf.save(`${blueprint.name}-blueprint.pdf`)
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
   }
 
-  const handleShare = () => {
-    // In a real app, this would open a share dialog
-    alert("In a real app, this would open sharing options")
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: blueprint.name,
+          text: `Check out my startup blueprint for ${blueprint.name}`,
+          url: window.location.href
+        })
+      } else {
+        await navigator.clipboard.writeText(window.location.href)
+        alert('Link copied to clipboard!')
+      }
+    } catch (error) {
+      console.error('Error sharing:', error)
+      alert('Failed to share. Please try again.')
+    }
   }
 
   return (
@@ -150,7 +170,7 @@ export function BlueprintOutput({ blueprint }: BlueprintProps) {
         </TabsContent>
       </Tabs>
 
-      <div className="hidden print:block">
+      <div id="blueprint-content" className="hidden print:block">
         <BlueprintContent blueprint={blueprint} />
       </div>
     </div>
